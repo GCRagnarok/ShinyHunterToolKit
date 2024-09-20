@@ -3,7 +3,7 @@
 ## Overview
 ShinyHunterToolKit is a tool for shiny hunting in Pokémon games on emulators. It uses ImGui for the user interface, GLFW for window management, GLEW for OpenGL extension loading, and ViGEm for virtual gamepad emulation.
 
-Only supports xinput controllers (Xbox Series/One/360).
+Only supports XInput devices, i.e., Xbox controllers.
 
 ## Features
 ### Shiny Counter:
