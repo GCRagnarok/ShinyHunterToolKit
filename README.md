@@ -16,11 +16,18 @@ Only supports XInput devices, i.e., Xbox controllers.
 ### Controller Manager:
 - Display physical and virtual controller status (text colour green/red = connected/disconnected)
 - Repeated virtual controller button presses:
-  1. Use the GUI button or controller shortcut to engage.
+  1. Use the GUI button to engage.
   2. Press any button on the physical controller.
-  3. Virtual controller will repeatdly press this button.
-  4. Use the GUI button or controller shortcut to disengage.
+  3. Virtual controller will repeatedly press this button.
+  4. Use the GUI button to disengage.
+- Record/Playback Macros:
+    1. Use the GUI button or controller combo (hold LT + RT for 1 second) to begin recording.
+    2. Press any sequence of buttons on the physical controller.
+    3. Use the GUI button or controller combo (hold LT + RT for 1 second) to finish recording.
+    4. Use the GUI button or controller combo (L3 + R3) to playback recording.
+    5. Virtual controller will playback recording in a loop.
+    6. Use the GUI button or controller combo (L3 + R3) to stop playback.
 
 ## Download
-- Head to [Releases](https://github.com/GCRagnarok/ShinyHunterToolKit/releases) and download the latest release.
-- Unzip and run the exe.
+- Head to [Releases](https://github.com/GCRagnarok/ShinyHunterToolKit/releases) and download the latest release (ShinyHunterToolKit_vX.X).
+- Unzip and run ShinyHunterToolKit.exe.
