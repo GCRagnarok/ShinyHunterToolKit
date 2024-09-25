@@ -5,6 +5,7 @@
 #include <xinput.h>
 #include <iostream>
 #include <string>
+#include <vector>
 
 class ViGEmManager
 {
@@ -27,6 +28,9 @@ public:
     void PressUserButtonRepeatedly(WORD p_Button);
     void StopPressingUserButton();
 
+    void PressUserMacroRepeatedly(const std::vector<std::pair<WORD, std::chrono::milliseconds>>& buttonSequence);
+	void StopUserMacro();
+
     bool m_IsVirtualControllerConnected;
 
     std::string GetButtonName(WORD p_Button)
@@ -43,11 +47,9 @@ public:
         case XUSB_GAMEPAD_DPAD_RIGHT: return "DPAD_RIGHT";
         case XUSB_GAMEPAD_START: return "START";
         case XUSB_GAMEPAD_BACK: return "BACK";
-        case XUSB_GAMEPAD_LEFT_THUMB: return "LEFT_THUMB";
-        case XUSB_GAMEPAD_RIGHT_THUMB: return "RIGHT_THUMB";
         case XUSB_GAMEPAD_LEFT_SHOULDER: return "LEFT_SHOULDER";
         case XUSB_GAMEPAD_RIGHT_SHOULDER: return "RIGHT_SHOULDER";
-        default: return "UNKNOWN";
+        default: return "NULL";
         }
     }
 private:
@@ -55,4 +57,5 @@ private:
     PVIGEM_TARGET m_VirtualController;
     WORD m_PreviousButtonState;
     std::atomic<bool> m_StopPressingUserButton;
+    std::atomic<bool> m_StopUserMacro;
 };

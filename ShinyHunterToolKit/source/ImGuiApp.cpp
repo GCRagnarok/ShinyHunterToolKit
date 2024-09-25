@@ -529,13 +529,13 @@ void ImGuiApp::HandleImGuiRepeatedThreadStop()
 
 void ImGuiApp::RepeatedButtonPress()
 {
-    const char* buttonLabel = m_IsAutomaticButtonActivated ? "Disengage Repeated Button Presses" : "Engage Repeated Button Presses";
+    const char* buttonLabel = m_IsAutomaticButtonActivated ? "Disengage Automatic Button Press" : "Engage Automatic Button Press";
 
     bool canDisplayTriggersMessage = true;
     bool isDisplayingTriggersMessage = false;
 
     ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[5]);
-    CenteredText("Automatic Button Presses");
+    CenteredText("Automatic Button Press");
     ImGui::PopFont();
 
     ImGui::Spacing();
@@ -569,19 +569,6 @@ void ImGuiApp::RepeatedButtonPress()
                         });
                 }
             });
-
-        if (m_IsAutomaticButtonActivated)
-        {
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-            CenteredText("(Or hold both triggers for 1 second to disengage!)");
-			ImGui::PopFont();
-        }
-        else
-        {
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-            CenteredText("(Or hold both triggers for 1 second to engage!)");
-            ImGui::PopFont();
-        }
     }
 
     ImGui::Spacing();
@@ -598,24 +585,195 @@ void ImGuiApp::RepeatedButtonPress()
         if (m_PhysicalControllerManager->m_WaitingForUserInput.load())
         {
             ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorYellow);
-            CenteredText("Press any button to start repeated button presses.");
+            CenteredText("Press any button to start automatic button presses.");
             ImGui::PopStyleColor();
         }
         else
         {
             ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorRed);
-            CenteredText("Repeated button presses disengaged.");
+            CenteredText("automatic button press disengaged.");
             ImGui::PopStyleColor();
         }
     }
     else
     {
         ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorGreen);
-        CenteredText("Repeated button presses engaged!");
+        CenteredText("automatic button press engaged!");
         ImGui::PopStyleColor();
     }
 
     ImGui::Spacing();
+}
+
+void ImGuiApp::SetIsRecordMacroButtonActived(bool p_IsRecordMacroButtonActived)
+{
+    m_IsRecordMacroButtonActivated = p_IsRecordMacroButtonActived;
+}
+
+void ImGuiApp::SetIsPlaybackMacroButtonActived(bool p_IsPlaybackMacroButtonActived)
+{
+    m_IsPlaybackMacroButtonActivated = p_IsPlaybackMacroButtonActived;
+}
+
+void ImGuiApp::StartPlaybackButtonThread(std::function<void()> p_Function)
+{
+    m_IsPlaybackMacroButtonActivated = true;
+    m_IsPlaybackButtonThreadRunning.store(true);
+    m_PlaybackButtonThread = std::thread([this, p_Function]()
+        {
+            p_Function();
+        });
+
+    std::cout << "Started repeated button thread\n";
+}
+
+void ImGuiApp::StopPlaybackButtonThread()
+{
+    m_IsPlaybackMacroButtonActivated = false;
+    m_IsPlaybackButtonThreadRunning.store(false);
+    if (m_PlaybackButtonThread.joinable())
+    {
+
+        m_PlaybackButtonThread.join();
+    }
+}
+
+void ImGuiApp::HandleImGuiPlaybackThreadStop()
+{
+    if (m_IsPlaybackButtonThreadRunning.load())
+    {
+        StopPlaybackButtonThread();
+    }
+    else
+    {
+        SetIsPlaybackMacroButtonActived(false);
+    }
+}
+
+void ImGuiApp::Macros()
+{
+    const char* recordButtonLabel = m_IsRecordMacroButtonActivated ? "Stop Recording Macro" : "Start Recording Macro";
+    const char* playbackButtonLabel = m_IsPlaybackMacroButtonActivated ? "Stop Macro Playback" : "Start Macro Playback";
+
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[5]);
+    CenteredText("Macros");
+    ImGui::PopFont();
+
+    ImGui::Spacing();
+
+	// record macro
+
+    if (m_PhysicalControllerManager->m_IsControllerConnected && !m_PhysicalControllerManager->m_IsMacroThreadRunning.load())
+    {
+        CenteredButton(recordButtonLabel, [this]()
+            {
+                m_PhysicalControllerManager->HandleRecordMacroThread();
+            });
+
+        if (!m_IsRecordMacroButtonActivated)
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            CenteredText("(Or hold both triggers for 1 second begin recording!)");
+            ImGui::PopFont();
+        }
+        else
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            CenteredText("(Or hold both triggers for 1 second to stop recording!)");
+            ImGui::PopFont();
+        }
+
+        ImGui::Spacing();
+    }
+
+    if (!m_PhysicalControllerManager->IsControllerConnected())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorRed);
+        CenteredText("Please connect a controller to use this feature.");
+        ImGui::PopStyleColor();
+        return;
+    }
+	else if (!m_PhysicalControllerManager->m_IsMacroThreadRunning.load())
+    {
+        if (m_PhysicalControllerManager->m_WaitingForUserInputSequence.load())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorYellow);
+            CenteredText("Recording macro...");
+            ImGui::PopStyleColor();
+        }
+		else if (m_PhysicalControllerManager->m_ButtonSequence.empty())
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorRed);
+			CenteredText("No macro recorded.");
+			ImGui::PopStyleColor();
+		}
+		else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorGreen);
+            CenteredText("Macro ready for playback.");
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::Spacing();
+    }
+
+	// playback macro
+
+    if (m_PhysicalControllerManager->m_IsControllerConnected && !m_PhysicalControllerManager->m_ButtonSequence.empty() && !m_PhysicalControllerManager->m_WaitingForUserInputSequence.load())
+    {
+        CenteredButton(playbackButtonLabel, [this]()
+            {
+                // Stop when disengaged by controller
+                if (!m_IsPlaybackButtonThreadRunning.load() && m_PhysicalControllerManager->m_IsMacroThreadRunning.load())
+                {
+                    m_PhysicalControllerManager->StopMacroButtonSequence();
+					SetIsPlaybackMacroButtonActived(false);
+                }
+				// Stop when disengaged by ImGui Button
+				else if (m_IsPlaybackButtonThreadRunning.load() || m_PhysicalControllerManager->m_WaitingForUserInputSequence.load())
+				{
+					m_PhysicalControllerManager->StopMacroButtonSequence();
+					HandleImGuiPlaybackThreadStop();
+				}
+				// start when activated by ImGui Button
+                else
+                {
+                    StartPlaybackButtonThread([this]()
+                        {
+                            m_PhysicalControllerManager->HandlePlaybackMacroThread();
+                        });
+                }
+            });
+
+        if (!m_IsPlaybackMacroButtonActivated)
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            CenteredText("(Or press L3 + R3 to begin playback!)");
+            ImGui::PopFont();
+        }
+        else
+        {
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            CenteredText("(Or press L3 + R3 to stop playback!)");
+            ImGui::PopFont();
+        }
+
+        ImGui::Spacing();
+
+        if (!m_PhysicalControllerManager->m_IsMacroThreadRunning.load())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorRed);
+            CenteredText("Macro disengaged.");
+            ImGui::PopStyleColor();
+        }
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, m_TextColorGreen);
+            CenteredText("Macro engaged!");
+            ImGui::PopStyleColor();
+        }
+    }
+
 }
 
 // ImGui Render/Clean Functions ------------------------------------------------
@@ -678,6 +836,9 @@ void ImGuiApp::Render()
     ImGui::Separator();
 
     RepeatedButtonPress();
+    ImGui::Separator();
+
+	Macros();
 
     ImGui::End();
 }

@@ -9,8 +9,9 @@ PhysicalControllerManager::PhysicalControllerManager(ViGEmManager& p_viGEmManage
     m_ImGuiApp(p_ImGuiApp),
     m_IsControllerConnected(false),
     m_WasResetComboPressed(false),
-    m_WasRepeatedComboPressed(false),
-    m_IsRepeatedThreadRunning(false)
+    m_WasRecordComboPressed(false),
+    m_IsRepeatedThreadRunning(false),
+	m_IsMacroThreadRunning(false)
 {
     ZeroMemory(&m_ControllerState, sizeof(XINPUT_STATE));
     m_IsRunning = true;
@@ -56,6 +57,8 @@ void PhysicalControllerManager::RunUpdateThread()
     }
 }
 
+// Controller Status ----------------------------------------------------------
+
 void PhysicalControllerManager::CheckPhysicalControllerState()
 {
     ZeroMemory(&m_ControllerState, sizeof(XINPUT_STATE));
@@ -98,6 +101,8 @@ std::string PhysicalControllerManager::CheckPhysicalControllerConnected()
 	}
 }
 
+// Controller Reset Combo ------------------------------------------------------
+
 void PhysicalControllerManager::CheckResetCombo(const XINPUT_STATE& p_ControllerState)
 {
     WORD currentButtonState = p_ControllerState.Gamepad.wButtons;
@@ -137,28 +142,7 @@ void PhysicalControllerManager::CheckResetCombo(const XINPUT_STATE& p_Controller
     m_WasResetComboPressed = isResetComboPressed;
 }
 
-// Check if the left trigger and right trigger are pressed
-bool PhysicalControllerManager::IsRepeatedComboPressed(const XINPUT_STATE& p_ControllerState)
-{
-    return (p_ControllerState.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD) &&
-        (p_ControllerState.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
-}
-
-void PhysicalControllerManager::HandleRepeatedComboHeld()
-{
-    if (!m_IsRepeatedComboHeld)
-    {
-        m_RepeatedComboStartTime = std::chrono::steady_clock::now();
-        m_IsRepeatedComboHeld = true;
-    }
-
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - m_RepeatedComboStartTime).count();
-    if (duration >= m_RepeatedComboDelay)
-    {
-        HandleRepeatedThread();
-    }
-}
+// Repeated Button Press -------------------------------------------------------
 
 void PhysicalControllerManager::HandleRepeatedThread()
 {
@@ -179,7 +163,6 @@ void PhysicalControllerManager::HandleRepeatedThread()
         waitForUserButtonPressThread.detach();
 
     }
-    m_IsRepeatedComboHeld = false;
 }
 
 void PhysicalControllerManager::WaitForUserButtonPress()
@@ -205,8 +188,8 @@ void PhysicalControllerManager::WaitForUserButtonPress()
             else if (newButtonState & XINPUT_GAMEPAD_DPAD_DOWN) repeatedButton = XUSB_GAMEPAD_DPAD_DOWN;
             else if (newButtonState & XINPUT_GAMEPAD_DPAD_LEFT) repeatedButton = XUSB_GAMEPAD_DPAD_LEFT;
             else if (newButtonState & XINPUT_GAMEPAD_DPAD_RIGHT) repeatedButton = XUSB_GAMEPAD_DPAD_RIGHT;
-            else if (newButtonState & XINPUT_GAMEPAD_LEFT_THUMB) repeatedButton = XUSB_GAMEPAD_LEFT_THUMB;
-            else if (newButtonState & XINPUT_GAMEPAD_RIGHT_THUMB) repeatedButton = XUSB_GAMEPAD_RIGHT_THUMB;
+            else if (newButtonState & XINPUT_GAMEPAD_LEFT_SHOULDER) repeatedButton = XUSB_GAMEPAD_LEFT_SHOULDER;
+            else if (newButtonState & XINPUT_GAMEPAD_RIGHT_SHOULDER) repeatedButton = XUSB_GAMEPAD_RIGHT_SHOULDER;
 
             if (repeatedButton != 0)
             {
@@ -220,28 +203,6 @@ void PhysicalControllerManager::WaitForUserButtonPress()
 			shouldExitEarly = true;
 			break;
 		}
-
-        // Check for controller disengagement
-        if (IsRepeatedComboPressed(newState))
-        {
-            if (!m_IsRepeatedComboHeld)
-            {
-                m_RepeatedComboStartTime = std::chrono::steady_clock::now();
-                m_IsRepeatedComboHeld = true;
-            }
-
-            auto now = std::chrono::steady_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - m_RepeatedComboStartTime).count();
-            if (duration >= m_RepeatedComboDelay)
-            {
-                shouldExitEarly = true;
-                break;
-            }
-        }
-        else
-        {
-            m_IsRepeatedComboHeld = false;
-        }
 
         // GUI disengagement
         if (!m_ImGuiApp.m_IsAutomaticButtonActivated)
@@ -291,34 +252,265 @@ void PhysicalControllerManager::StopRepeatedButtonPress()
     std::cout << "\nRepeated button press stopped." << std::endl;
 }
 
-void PhysicalControllerManager::CheckRepeatedCombo(const XINPUT_STATE& p_ControllerState)
-{
-    bool isRepeatedComboPressed = IsRepeatedComboPressed(p_ControllerState);
+// Record Macro ----------------------------------------------------------------
 
-    if (isRepeatedComboPressed)
+// Check if the left trigger and right trigger are pressed
+bool PhysicalControllerManager::IsRecordComboPressed(const XINPUT_STATE& p_ControllerState)
+{
+    return (p_ControllerState.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD) &&
+        (p_ControllerState.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+}
+
+void PhysicalControllerManager::CheckRecordCombo(const XINPUT_STATE& p_ControllerState)
+{
+    bool isRecordComboPressed = IsRecordComboPressed(p_ControllerState);
+
+    if (isRecordComboPressed)
     {
-        if (!m_IsRepeatedComboHeld)
+        if (!m_IsRecordComboHeld)
         {
-            m_RepeatedComboStartTime = std::chrono::steady_clock::now();
-            m_IsRepeatedComboHeld = true;
+            m_RecordComboStartTime = std::chrono::steady_clock::now();
+            m_IsRecordComboHeld = true;
         }
         else
         {
-            HandleRepeatedComboHeld();
+            HandleRecordComboHeld();
         }
     }
     else
     {
-        m_IsRepeatedComboHeld = false;
+        m_IsRecordComboHeld = false;
     }
 
-    m_WasRepeatedComboPressed = isRepeatedComboPressed;
+    m_WasRecordComboPressed = isRecordComboPressed;
 }
+
+void PhysicalControllerManager::HandleRecordComboHeld()
+{
+    if (!m_IsRecordComboHeld)
+    {
+        m_RecordComboStartTime = std::chrono::steady_clock::now();
+        m_IsRecordComboHeld = true;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - m_RecordComboStartTime).count();
+    if (duration >= m_RecordComboDelay)
+    {
+        HandleRecordMacroThread();
+    }
+}
+
+void PhysicalControllerManager::HandleRecordMacroThread()
+{
+    if (!m_ImGuiApp.m_IsPlaybackButtonThreadRunning)
+    {
+        if (m_WaitingForUserInputSequence.load())
+        {
+            m_WaitingForUserInputSequence.store(false);
+            m_ImGuiApp.SetIsRecordMacroButtonActived(false);
+        }
+        else
+        {
+            if (!m_ImGuiApp.m_IsRecordMacroButtonActivated)
+            {
+                m_ImGuiApp.SetIsRecordMacroButtonActived(true);
+            }
+
+            std::cout << "Please input your button sequence and press the GUI button or record combo when sequence is complete:\n";
+            std::thread waitForUserButtonSequenceThread(&PhysicalControllerManager::WaitForUserButtonSequence, this);
+            waitForUserButtonSequenceThread.detach();
+        }
+    }
+    m_IsRecordComboHeld = false;
+}
+
+void PhysicalControllerManager::WaitForUserButtonSequence()
+{
+    m_ButtonSequence.clear();
+
+    m_WaitingForUserInputSequence.store(true); // Set to true while waiting for user input
+    auto startTime = std::chrono::steady_clock::now();
+    WORD lastButtons = 0;
+    bool shouldExitEarly = false;
+
+    while (true)
+    {
+        // Capture the current button state
+        XINPUT_STATE state;
+        if (XInputGetState(0, &state) == ERROR_SUCCESS)
+        {
+            WORD buttons = state.Gamepad.wButtons;
+
+            // End button sequence recording when GUI button is pressed
+            if (!m_ImGuiApp.m_IsRecordMacroButtonActivated)
+            {
+                if (m_ButtonSequence.empty())
+                {
+                    std::cout << "No button sequence recorded." << std::endl;
+                    break;
+                }
+                else
+                {
+                    std::cout << "Button sequence input complete." << std::endl;
+                    m_ImGuiApp.SetIsRecordMacroButtonActived(false);
+                    break;
+                }
+            }
+
+            // Calculate the time elapsed since the last button press
+            auto currentTime = std::chrono::steady_clock::now();
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+
+            // Record button press and release events
+            if (buttons != lastButtons)
+            {
+                // Record button press
+                if (buttons != 0)
+                {
+                    m_ButtonSequence.emplace_back(buttons, elapsedTime);
+                }
+                // Record button release
+                else if (lastButtons != 0)
+                {
+                    m_ButtonSequence.emplace_back(0, elapsedTime);
+                }
+
+                startTime = currentTime;
+                lastButtons = buttons;
+            }
+
+            if (m_WaitingForUserInputSequence.load() == false)
+            {
+                m_ImGuiApp.SetIsRecordMacroButtonActived(false);
+                break;
+            }
+        }
+
+        // Check for controller disconnection
+        if (!m_IsControllerConnected)
+        {
+            shouldExitEarly = true;
+            break;
+        }
+
+        // Check for controller disengagement
+        if (IsRecordComboPressed(state))
+        {
+            if (!m_IsRecordComboHeld)
+            {
+                m_RecordComboStartTime = std::chrono::steady_clock::now();
+                m_IsRecordComboHeld = true;
+            }
+
+            auto now = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - m_RecordComboStartTime).count();
+            if (duration >= m_RecordComboDelay)
+            {
+                shouldExitEarly = true;
+                break;
+            }
+        }
+        else
+        {
+            m_IsRecordComboHeld = false;
+        }
+
+        // GUI disengagement
+        if (!m_ImGuiApp.m_IsRecordMacroButtonActivated)
+        {
+            shouldExitEarly = true;
+            break;
+        }
+
+        // Periodically check if the thread should exit
+        std::unique_lock<std::mutex> lock(m_Mutex);
+        if (m_ExitCondition.wait_for(lock, std::chrono::milliseconds(100), [this] { return m_ShouldExit; }))
+        {
+            std::cout << "Thread exit condition met\n";
+            shouldExitEarly = true;
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    m_WaitingForUserInputSequence.store(false);
+
+    if (shouldExitEarly)
+    {
+        m_ImGuiApp.SetIsRecordMacroButtonActived(false);
+    }
+}
+
+// Playback Macro --------------------------------------------------------------
+
+// Check if the left thumbstick (L3) and right thumbstick (R3) are pressed
+bool PhysicalControllerManager::IsPlayComboPressed(const XINPUT_STATE& p_ControllerState)
+{
+    return (p_ControllerState.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) &&
+        (p_ControllerState.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB);
+}
+
+void PhysicalControllerManager::CheckPlayCombo(const XINPUT_STATE& p_ControllerState)
+{
+    static bool wasPlayComboPressed = false;
+    bool isPlayComboPressed = IsPlayComboPressed(p_ControllerState);
+
+    if (isPlayComboPressed && !wasPlayComboPressed)
+    {
+        HandlePlaybackMacroThread();
+    }
+
+    wasPlayComboPressed = isPlayComboPressed;
+}
+
+void PhysicalControllerManager::HandlePlaybackMacroThread()
+{
+    if (m_IsMacroThreadRunning.load())
+    {
+        StopMacroButtonSequence();
+        m_ImGuiApp.HandleImGuiPlaybackThreadStop();
+    }
+    else
+    {
+        if (!m_ImGuiApp.m_IsPlaybackMacroButtonActivated)
+        {
+            m_ImGuiApp.SetIsPlaybackMacroButtonActived(true);
+        }
+
+        StartMacroButtonSequence(m_ButtonSequence);
+    }
+}
+
+void PhysicalControllerManager::StartMacroButtonSequence(const std::vector<std::pair<WORD, std::chrono::milliseconds>>& buttonSequence)
+{
+    m_MacroThread = std::thread(&ViGEmManager::PressUserMacroRepeatedly, &m_ViGEmManager, buttonSequence);
+    m_IsMacroThreadRunning.store(true);
+
+    std::cout << "\nMacro button sequence started." << std::endl;
+}
+
+void PhysicalControllerManager::StopMacroButtonSequence()
+{
+    m_ViGEmManager.StopUserMacro();
+    if (m_MacroThread.joinable())
+    {
+        m_MacroThread.join();
+        std::cout << "Macro thread joined\n";
+    }
+    m_IsMacroThreadRunning.store(false);
+
+    std::cout << "\nMacro stopped." << std::endl;
+}
+
+// Controller Updates ---------------------------------------------------------
 
 void PhysicalControllerManager::CheckControllerInput(const XINPUT_STATE& p_ControllerState)
 {
     CheckResetCombo(p_ControllerState);
-    CheckRepeatedCombo(p_ControllerState);
+    CheckRecordCombo(p_ControllerState);
+    CheckPlayCombo(p_ControllerState);
 }
 
 void PhysicalControllerManager::SendInputToVirtualController()
@@ -329,9 +521,9 @@ void PhysicalControllerManager::SendInputToVirtualController()
 
 void PhysicalControllerManager::Update()
 {
-	CheckPhysicalControllerState();
+    CheckPhysicalControllerState();
 
-    if(m_IsControllerConnected)
+    if (m_IsControllerConnected)
     {
         CheckControllerInput(m_ControllerState);
         if (m_ViGEmManager.IsVirtualControllerConnected())

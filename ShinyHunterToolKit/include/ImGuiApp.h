@@ -23,6 +23,13 @@ public:
 	void StopRepeatedButtonThread();
 	void HandleImGuiRepeatedThreadStop();
 
+	void StartPlaybackButtonThread(std::function<void()> p_Function);
+	void StopPlaybackButtonThread();
+
+	void SetIsRecordMacroButtonActived(bool p_IsRecordMacroButtonActived);
+	void SetIsPlaybackMacroButtonActived(bool p_IsPlaybackMacroButtonActived);
+	void HandleImGuiPlaybackThreadStop();
+
 	int m_InputEncountersPerReset;
 
 	int m_InputCurrentEncounters;
@@ -32,6 +39,10 @@ public:
 
 	bool m_IsAutomaticButtonActivated;
 	std::atomic<bool> m_IsRepeatedButtonThreadRunning;
+
+	bool m_IsRecordMacroButtonActivated;
+	bool m_IsPlaybackMacroButtonActivated;
+	std::atomic<bool> m_IsPlaybackButtonThreadRunning;
 
 
 private:
@@ -49,6 +60,7 @@ private:
 	void DisplayEncounters();
 	void DisplayControllerStates();
 	void RepeatedButtonPress();
+	void Macros();
 
     ShinyCounter m_ShinyCounter;
 	PhysicalControllerManager* m_PhysicalControllerManager;
@@ -60,4 +72,5 @@ private:
 	ImVec4 m_TextColorYellow;
 
 	std::thread m_RepeatedButtonThread;
+	std::thread m_PlaybackButtonThread;
 };

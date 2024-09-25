@@ -160,3 +160,60 @@ void ViGEmManager::StopPressingUserButton()
 {
     m_StopPressingUserButton = true;
 }
+
+void ViGEmManager::PressUserMacroRepeatedly(const std::vector<std::pair<WORD, std::chrono::milliseconds>>& buttonSequence)
+{
+    m_StopUserMacro = false;
+
+    while (!m_StopUserMacro)
+    {
+        for (size_t i = 0; i < buttonSequence.size(); ++i)
+        {
+            if (m_StopUserMacro) break;
+
+            WORD button = buttonSequence[i].first;
+            auto delay = buttonSequence[i].second;
+
+            // Wait for the specified delay before pressing the button
+            std::this_thread::sleep_for(delay);
+
+            XUSB_REPORT report = {};
+            report.wButtons = button;
+
+            // Send the button press input
+            ReceiveInput(report);
+
+            // If this is a press event, hold the button for the specified duration
+            if (button != 0)
+            {
+                // Calculate the hold duration by checking the next event's delay
+                auto holdDuration = (i + 1 < buttonSequence.size()) ? buttonSequence[i + 1].second : std::chrono::milliseconds(0);
+                auto start = std::chrono::steady_clock::now();
+
+                // Continuously send the button press input during the hold duration
+                while (std::chrono::steady_clock::now() - start < holdDuration)
+                {
+                    ReceiveInput(report);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Adjust the interval as needed
+                }
+
+                // Send the button release input
+                report.wButtons = 0;
+                ReceiveInput(report);
+            }
+        }
+
+        // Add a delay between the end and the start of the sequence
+        std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Adjust the delay as needed
+    }
+
+    // Ensure all buttons are released when stopping
+    XUSB_REPORT report = {};
+    report.wButtons = 0;
+    ReceiveInput(report);
+}
+
+void ViGEmManager::StopUserMacro()
+{
+    m_StopUserMacro = true;
+}
