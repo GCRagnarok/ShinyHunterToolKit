@@ -263,6 +263,7 @@ bool PhysicalControllerManager::IsRecordComboPressed(const XINPUT_STATE& p_Contr
 
 void PhysicalControllerManager::CheckRecordCombo(const XINPUT_STATE& p_ControllerState)
 {
+
     bool isRecordComboPressed = IsRecordComboPressed(p_ControllerState);
 
     if (isRecordComboPressed)
@@ -303,7 +304,7 @@ void PhysicalControllerManager::HandleRecordComboHeld()
 
 void PhysicalControllerManager::HandleRecordMacroThread()
 {
-    if (!m_ImGuiApp.m_IsPlaybackButtonThreadRunning)
+	if (!m_IsMacroThreadRunning.load())
     {
         if (m_WaitingForUserInputSequence.load())
         {
@@ -467,20 +468,23 @@ void PhysicalControllerManager::CheckPlayCombo(const XINPUT_STATE& p_ControllerS
 
 void PhysicalControllerManager::HandlePlaybackMacroThread()
 {
-    if (m_IsMacroThreadRunning.load())
-    {
-        StopMacroButtonSequence();
-        m_ImGuiApp.HandleImGuiPlaybackThreadStop();
-    }
-    else
-    {
-        if (!m_ImGuiApp.m_IsPlaybackMacroButtonActivated)
+	if (!m_WaitingForUserInputSequence.load())
+	{
+        if (m_IsMacroThreadRunning.load())
         {
-            m_ImGuiApp.SetIsPlaybackMacroButtonActived(true);
+            StopMacroButtonSequence();
+            m_ImGuiApp.HandleImGuiPlaybackThreadStop();
         }
+        else
+        {
+            if (!m_ImGuiApp.m_IsPlaybackMacroButtonActivated)
+            {
+                m_ImGuiApp.SetIsPlaybackMacroButtonActived(true);
+            }
 
-        StartMacroButtonSequence(m_ButtonSequence);
-    }
+            StartMacroButtonSequence(m_ButtonSequence);
+        }
+	}
 }
 
 void PhysicalControllerManager::StartMacroButtonSequence(const std::vector<std::pair<WORD, std::chrono::milliseconds>>& buttonSequence)
